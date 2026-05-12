@@ -1,5 +1,5 @@
 """
-Metrics collection service for WiFi-DensePose API
+WiFi-DensePose API 的指标采集服务
 """
 
 import asyncio
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MetricPoint:
-    """Single metric data point."""
+    """单个指标数据点。"""
     timestamp: datetime
     value: float
     labels: Dict[str, str] = field(default_factory=dict)
@@ -26,14 +26,14 @@ class MetricPoint:
 
 @dataclass
 class MetricSeries:
-    """Time series of metric points."""
+    """指标数据点的时间序列。"""
     name: str
     description: str
     unit: str
     points: deque = field(default_factory=lambda: deque(maxlen=1000))
     
     def add_point(self, value: float, labels: Optional[Dict[str, str]] = None):
-        """Add a metric point."""
+        """添加一个指标数据点。"""
         point = MetricPoint(
             timestamp=datetime.utcnow(),
             value=value,
@@ -42,11 +42,11 @@ class MetricSeries:
         self.points.append(point)
     
     def get_latest(self) -> Optional[MetricPoint]:
-        """Get the latest metric point."""
+        """获取最新的指标数据点。"""
         return self.points[-1] if self.points else None
     
     def get_average(self, duration: timedelta) -> Optional[float]:
-        """Get average value over a time duration."""
+        """获取指定时间范围内的平均值。"""
         cutoff = datetime.utcnow() - duration
         relevant_points = [
             point for point in self.points
@@ -59,7 +59,7 @@ class MetricSeries:
         return sum(point.value for point in relevant_points) / len(relevant_points)
     
     def get_max(self, duration: timedelta) -> Optional[float]:
-        """Get maximum value over a time duration."""
+        """获取指定时间范围内的最大值。"""
         cutoff = datetime.utcnow() - duration
         relevant_points = [
             point for point in self.points
@@ -73,7 +73,7 @@ class MetricSeries:
 
 
 class MetricsService:
-    """Service for collecting and managing application metrics."""
+    """用于采集和管理应用指标的服务。"""
     
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -85,13 +85,13 @@ class MetricsService:
         self._initialized = False
         self._running = False
         
-        # Initialize standard metrics
+        # 初始化标准指标
         self._initialize_standard_metrics()
     
     def _initialize_standard_metrics(self):
-        """Initialize standard system and application metrics."""
+        """初始化标准系统指标和应用指标。"""
         self._metrics.update({
-            # System metrics
+            # 系统指标
             "system_cpu_usage": MetricSeries(
                 "system_cpu_usage", "System CPU usage percentage", "percent"
             ),
@@ -108,7 +108,7 @@ class MetricsService:
                 "system_network_bytes_recv", "Network bytes received", "bytes"
             ),
             
-            # Application metrics
+            # 应用指标
             "app_requests_total": MetricSeries(
                 "app_requests_total", "Total HTTP requests", "count"
             ),
@@ -131,7 +131,7 @@ class MetricsService:
                 "app_stream_fps", "Streaming frames per second", "fps"
             ),
             
-            # Error metrics
+            # 错误指标
             "app_errors_total": MetricSeries(
                 "app_errors_total", "Total application errors", "count"
             ),
@@ -141,7 +141,7 @@ class MetricsService:
         })
     
     async def initialize(self):
-        """Initialize metrics service."""
+        """初始化指标服务。"""
         if self._initialized:
             return
         
@@ -150,7 +150,7 @@ class MetricsService:
         logger.info("Metrics service initialized")
     
     async def start(self):
-        """Start metrics service."""
+        """启动指标服务。"""
         if not self._initialized:
             await self.initialize()
         
@@ -158,42 +158,42 @@ class MetricsService:
         logger.info("Metrics service started")
     
     async def shutdown(self):
-        """Shutdown metrics service."""
+        """关闭指标服务。"""
         self._running = False
         logger.info("Metrics service shut down")
     
     async def collect_metrics(self):
-        """Collect all metrics."""
+        """采集所有指标。"""
         if not self._running:
             return
         
         logger.debug("Collecting metrics")
         
-        # Collect system metrics
+        # 采集系统指标
         await self._collect_system_metrics()
         
-        # Collect application metrics
+        # 采集应用指标
         await self._collect_application_metrics()
         
         logger.debug("Metrics collection completed")
     
     async def _collect_system_metrics(self):
-        """Collect system-level metrics."""
+        """采集系统级指标。"""
         try:
-            # CPU usage
+            # CPU 使用率
             cpu_percent = psutil.cpu_percent(interval=1)
             self._metrics["system_cpu_usage"].add_point(cpu_percent)
             
-            # Memory usage
+            # 内存使用率
             memory = psutil.virtual_memory()
             self._metrics["system_memory_usage"].add_point(memory.percent)
             
-            # Disk usage
+            # 磁盘使用率
             disk = psutil.disk_usage('/')
             disk_percent = (disk.used / disk.total) * 100
             self._metrics["system_disk_usage"].add_point(disk_percent)
             
-            # Network I/O
+            # 网络 I/O
             network = psutil.net_io_counters()
             self._metrics["system_network_bytes_sent"].add_point(network.bytes_sent)
             self._metrics["system_network_bytes_recv"].add_point(network.bytes_recv)
@@ -202,22 +202,22 @@ class MetricsService:
             logger.error(f"Error collecting system metrics: {e}")
     
     async def _collect_application_metrics(self):
-        """Collect application-specific metrics."""
+        """采集应用特定指标。"""
         try:
-            # Import here to avoid circular imports
+            # 在此处导入以避免循环依赖
             from src.api.websocket.connection_manager import connection_manager
             
-            # Active connections
+            # 活跃连接数
             connection_stats = await connection_manager.get_connection_stats()
             active_connections = connection_stats.get("active_connections", 0)
             self._metrics["app_active_connections"].add_point(active_connections)
             
-            # Update counters as metrics
+            # 将计数器作为指标写入
             for name, value in self._counters.items():
                 if name in self._metrics:
                     self._metrics[name].add_point(value)
             
-            # Update gauges as metrics
+            # 将仪表值作为指标写入
             for name, value in self._gauges.items():
                 if name in self._metrics:
                     self._metrics[name].add_point(value)
@@ -226,24 +226,24 @@ class MetricsService:
             logger.error(f"Error collecting application metrics: {e}")
     
     def increment_counter(self, name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None):
-        """Increment a counter metric."""
+        """递增计数器指标。"""
         self._counters[name] += value
         
         if name in self._metrics:
             self._metrics[name].add_point(self._counters[name], labels)
     
     def set_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
-        """Set a gauge metric value."""
+        """设置仪表指标值。"""
         self._gauges[name] = value
         
         if name in self._metrics:
             self._metrics[name].add_point(value, labels)
     
     def record_histogram(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
-        """Record a histogram value."""
+        """记录直方图指标值。"""
         self._histograms[name].append(value)
         
-        # Keep only last 1000 values
+        # 仅保留最近 1000 个值
         if len(self._histograms[name]) > 1000:
             self._histograms[name] = self._histograms[name][-1000:]
         
@@ -251,7 +251,7 @@ class MetricsService:
             self._metrics[name].add_point(value, labels)
     
     def time_function(self, metric_name: str):
-        """Decorator to time function execution."""
+        """用于统计函数执行耗时的装饰器。"""
         def decorator(func):
             import functools
             
@@ -280,11 +280,11 @@ class MetricsService:
         return decorator
     
     def get_metric(self, name: str) -> Optional[MetricSeries]:
-        """Get a metric series by name."""
+        """按名称获取指标序列。"""
         return self._metrics.get(name)
     
     def get_metric_value(self, name: str) -> Optional[float]:
-        """Get the latest value of a metric."""
+        """获取指标的最新值。"""
         metric = self._metrics.get(name)
         if metric:
             latest = metric.get_latest()
@@ -292,15 +292,15 @@ class MetricsService:
         return None
     
     def get_counter_value(self, name: str) -> float:
-        """Get current counter value."""
+        """获取当前计数器值。"""
         return self._counters.get(name, 0.0)
     
     def get_gauge_value(self, name: str) -> Optional[float]:
-        """Get current gauge value."""
+        """获取当前仪表值。"""
         return self._gauges.get(name)
     
     def get_histogram_stats(self, name: str) -> Dict[str, float]:
-        """Get histogram statistics."""
+        """获取直方图统计信息。"""
         values = self._histograms.get(name, [])
         if not values:
             return {}
@@ -321,10 +321,10 @@ class MetricsService:
         }
     
     async def get_all_metrics(self) -> Dict[str, Any]:
-        """Get all current metrics."""
+        """获取当前所有指标。"""
         metrics = {}
         
-        # Current metric values
+        # 当前指标值
         for name, metric_series in self._metrics.items():
             latest = metric_series.get_latest()
             if latest:
@@ -336,19 +336,19 @@ class MetricsService:
                     "labels": latest.labels
                 }
         
-        # Counter values
+        # 计数器值
         metrics.update({
             f"counter_{name}": value
             for name, value in self._counters.items()
         })
         
-        # Gauge values
+        # 仪表值
         metrics.update({
             f"gauge_{name}": value
             for name, value in self._gauges.items()
         })
         
-        # Histogram statistics
+        # 直方图统计信息
         for name, values in self._histograms.items():
             if values:
                 stats = self.get_histogram_stats(name)
@@ -357,7 +357,7 @@ class MetricsService:
         return metrics
     
     async def get_system_metrics(self) -> Dict[str, Any]:
-        """Get system metrics summary."""
+        """获取系统指标摘要。"""
         return {
             "cpu_usage": self.get_metric_value("system_cpu_usage"),
             "memory_usage": self.get_metric_value("system_memory_usage"),
@@ -367,7 +367,7 @@ class MetricsService:
         }
     
     async def get_application_metrics(self) -> Dict[str, Any]:
-        """Get application metrics summary."""
+        """获取应用指标摘要。"""
         return {
             "requests_total": self.get_counter_value("app_requests_total"),
             "active_connections": self.get_metric_value("app_active_connections"),
@@ -380,7 +380,7 @@ class MetricsService:
         }
     
     async def get_performance_summary(self) -> Dict[str, Any]:
-        """Get performance metrics summary."""
+        """获取性能指标摘要。"""
         one_hour = timedelta(hours=1)
         
         return {
@@ -403,7 +403,7 @@ class MetricsService:
         }
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get metrics service status."""
+        """获取指标服务状态。"""
         return {
             "status": "healthy" if self._running else "stopped",
             "initialized": self._initialized,
@@ -416,14 +416,14 @@ class MetricsService:
         }
     
     def reset_metrics(self):
-        """Reset all metrics."""
+        """重置所有指标。"""
         logger.info("Resetting all metrics")
         
-        # Clear metric points but keep series definitions
+        # 清空指标数据点，但保留序列定义
         for metric_series in self._metrics.values():
             metric_series.points.clear()
         
-        # Reset counters, gauges, and histograms
+        # 重置计数器、仪表和直方图
         self._counters.clear()
         self._gauges.clear()
         self._histograms.clear()

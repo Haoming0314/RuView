@@ -1,9 +1,9 @@
 """
-Pose estimation service for WiFi-DensePose API.
+WiFi-DensePose API 的姿态估计服务。
 
-Production paths in this module must NEVER use random data generation.
-All mock/synthetic data generation is isolated in src.testing and is only
-invoked when settings.mock_pose_data is explicitly True.
+本模块中的生产路径绝不能使用随机数据生成。
+所有模拟/合成数据生成逻辑都被隔离在 `src.testing` 中，
+且仅在 `settings.mock_pose_data` 显式为 True 时才会被调用。
 """
 
 import logging
@@ -25,21 +25,21 @@ logger = logging.getLogger(__name__)
 
 
 class PoseService:
-    """Service for pose estimation operations."""
+    """提供姿态估计相关操作的服务。"""
     
     def __init__(self, settings: Settings, domain_config: DomainConfig):
-        """Initialize pose service."""
+        """初始化姿态服务。"""
         self.settings = settings
         self.domain_config = domain_config
         self.logger = logging.getLogger(__name__)
         
-        # Initialize components
+        # 初始化组件
         self.csi_processor = None
         self.phase_sanitizer = None
         self.densepose_model = None
         self.modality_translator = None
         
-        # Service state
+        # 服务状态
         self.is_initialized = False
         self.is_running = False
         self.last_error = None
@@ -48,7 +48,7 @@ class PoseService:
         self._calibration_id: Optional[str] = None
         self._calibration_start: Optional[datetime] = None
         
-        # Processing statistics
+        # 处理统计
         self.stats = {
             "total_processed": 0,
             "successful_detections": 0,
@@ -58,11 +58,11 @@ class PoseService:
         }
     
     async def initialize(self):
-        """Initialize the pose service."""
+        """初始化姿态服务。"""
         try:
             self.logger.info("Initializing pose service...")
             
-            # Initialize CSI processor
+            # 初始化 CSI 处理器
             csi_config = {
                 'buffer_size': self.settings.csi_buffer_size,
                 'sampling_rate': getattr(self.settings, 'csi_sampling_rate', 1000),
@@ -77,7 +77,7 @@ class PoseService:
             }
             self.csi_processor = CSIProcessor(config=csi_config)
             
-            # Initialize phase sanitizer
+            # 初始化相位净化器
             phase_config = {
                 'unwrapping_method': 'numpy',
                 'outlier_threshold': 3.0,
@@ -89,7 +89,7 @@ class PoseService:
             }
             self.phase_sanitizer = PhaseSanitizer(config=phase_config)
             
-            # Initialize models if not mocking
+            # 若非模拟模式，则初始化模型
             if not self.settings.mock_pose_data:
                 await self._initialize_models()
             else:
@@ -105,12 +105,12 @@ class PoseService:
             raise
     
     async def _initialize_models(self):
-        """Initialize neural network models."""
+        """初始化神经网络模型。"""
         try:
-            # Initialize DensePose model
+            # 初始化 DensePose 模型
             if self.settings.pose_model_path:
                 self.densepose_model = DensePoseHead()
-                # Load model weights if path is provided
+                # 若提供了路径，则加载模型权重
                 # model_state = torch.load(self.settings.pose_model_path)
                 # self.densepose_model.load_state_dict(model_state)
                 self.logger.info("DensePose model loaded")
@@ -118,16 +118,16 @@ class PoseService:
                 self.logger.warning("No pose model path provided, using default model")
                 self.densepose_model = DensePoseHead()
             
-            # Initialize modality translation
+            # 初始化模态转换网络
             config = {
-                'input_channels': 64,  # CSI data channels
+                'input_channels': 64,  # CSI 数据通道数
                 'hidden_channels': [128, 256, 512],
-                'output_channels': 256,  # Visual feature channels
+                'output_channels': 256,  # 视觉特征通道数
                 'use_attention': True
             }
             self.modality_translator = ModalityTranslationNetwork(config)
             
-            # Set models to evaluation mode
+            # 将模型切换到评估模式
             self.densepose_model.eval()
             self.modality_translator.eval()
             
@@ -136,7 +136,7 @@ class PoseService:
             raise
     
     async def start(self):
-        """Start the pose service."""
+        """启动姿态服务。"""
         if not self.is_initialized:
             await self.initialize()
         
@@ -144,25 +144,25 @@ class PoseService:
         self.logger.info("Pose service started")
     
     async def stop(self):
-        """Stop the pose service."""
+        """停止姿态服务。"""
         self.is_running = False
         self.logger.info("Pose service stopped")
     
     async def process_csi_data(self, csi_data: np.ndarray, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Process CSI data and estimate poses."""
+        """处理 CSI 数据并估计姿态。"""
         if not self.is_running:
             raise RuntimeError("Pose service is not running")
         
         start_time = datetime.now()
         
         try:
-            # Process CSI data
+            # 处理 CSI 数据
             processed_csi = await self._process_csi(csi_data, metadata)
             
-            # Estimate poses
+            # 估计姿态
             poses = await self._estimate_poses(processed_csi, metadata)
             
-            # Update statistics
+            # 更新统计信息
             processing_time = (datetime.now() - start_time).total_seconds() * 1000
             self._update_stats(poses, processing_time)
             
@@ -181,12 +181,12 @@ class PoseService:
             raise
     
     async def _process_csi(self, csi_data: np.ndarray, metadata: Dict[str, Any]) -> np.ndarray:
-        """Process raw CSI data."""
-        # Convert raw data to CSIData format
+        """处理原始 CSI 数据。"""
+        # 将原始数据转换为 CSIData 格式
         from src.hardware.csi_extractor import CSIData
         
-        # Create CSIData object with proper fields
-        # For mock data, create amplitude and phase from input
+        # 构造包含完整字段的 CSIData 对象
+        # 对模拟数据，根据输入生成幅度和相位
         if csi_data.ndim == 1:
             amplitude = np.abs(csi_data)
             phase = np.angle(csi_data) if np.iscomplexobj(csi_data) else np.zeros_like(csi_data)
@@ -198,30 +198,30 @@ class PoseService:
             timestamp=metadata.get("timestamp", datetime.now()),
             amplitude=amplitude,
             phase=phase,
-            frequency=metadata.get("frequency", 5.0),  # 5 GHz default
-            bandwidth=metadata.get("bandwidth", 20.0),  # 20 MHz default
+            frequency=metadata.get("frequency", 5.0),  # 默认 5 GHz
+            bandwidth=metadata.get("bandwidth", 20.0),  # 默认 20 MHz
             num_subcarriers=metadata.get("num_subcarriers", 56),
             num_antennas=metadata.get("num_antennas", 3),
-            snr=metadata.get("snr", 20.0),  # 20 dB default
+            snr=metadata.get("snr", 20.0),  # 默认 20 dB
             metadata=metadata
         )
         
-        # Process CSI data
+        # 处理 CSI 数据
         try:
             detection_result = await self.csi_processor.process_csi_data(csi_data_obj)
             
-            # Add to history for temporal analysis
+            # 加入历史记录，用于时序分析
             self.csi_processor.add_to_history(csi_data_obj)
             
-            # Extract amplitude data for pose estimation
+            # 提取用于姿态估计的幅度数据
             if detection_result and detection_result.features:
                 amplitude_data = detection_result.features.amplitude_mean
                 
-                # Apply phase sanitization if we have phase data
+                # 若存在相位数据，则执行相位净化
                 if hasattr(detection_result.features, 'phase_difference'):
                     phase_data = detection_result.features.phase_difference
                     sanitized_phase = self.phase_sanitizer.sanitize(phase_data)
-                    # Combine amplitude and phase data
+                    # 组合幅度和相位数据
                     return np.concatenate([amplitude_data, sanitized_phase])
                 
                 return amplitude_data
@@ -232,35 +232,35 @@ class PoseService:
         return csi_data
     
     async def _estimate_poses(self, csi_data: np.ndarray, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Estimate poses from processed CSI data."""
+        """根据处理后的 CSI 数据估计姿态。"""
         if self.settings.mock_pose_data:
             return self._generate_mock_poses()
         
         try:
-            # Convert CSI data to tensor
+            # 将 CSI 数据转换为张量
             csi_tensor = torch.from_numpy(csi_data).float()
             
-            # Add batch dimension if needed
+            # 若有需要，则增加 batch 维度
             if len(csi_tensor.shape) == 2:
                 csi_tensor = csi_tensor.unsqueeze(0)
             
-            # Translate modality (CSI to visual-like features)
+            # 进行模态转换（CSI -> 类视觉特征）
             with torch.no_grad():
                 visual_features = self.modality_translator(csi_tensor)
                 
-                # Estimate poses using DensePose
+                # 使用 DensePose 估计姿态
                 pose_outputs = self.densepose_model(visual_features)
             
-            # Convert outputs to pose detections
+            # 将输出转换为姿态检测结果
             poses = self._parse_pose_outputs(pose_outputs)
             
-            # Filter by confidence threshold
+            # 按置信度阈值过滤
             filtered_poses = [
                 pose for pose in poses 
                 if pose.get("confidence", 0.0) >= self.settings.pose_confidence_threshold
             ]
             
-            # Limit number of persons
+            # 限制人数上限
             if len(filtered_poses) > self.settings.pose_max_persons:
                 filtered_poses = sorted(
                     filtered_poses, 
@@ -275,17 +275,16 @@ class PoseService:
             return []
     
     def _parse_pose_outputs(self, outputs: torch.Tensor) -> List[Dict[str, Any]]:
-        """Parse neural network outputs into pose detections.
+        """将神经网络输出解析为姿态检测结果。
 
-        Extracts confidence, keypoints, bounding boxes, and activity from model
-        output tensors. The exact interpretation depends on the model architecture;
-        this implementation assumes the DensePoseHead output format.
+        从模型输出张量中提取置信度、关键点、边界框和活动类型。
+        具体解释方式取决于模型结构；当前实现假设输出符合 DensePoseHead 的格式。
 
         Args:
-            outputs: Model output tensor of shape (batch, features).
+            outputs: 形状为 `(batch, features)` 的模型输出张量。
 
         Returns:
-            List of pose detection dictionaries.
+            姿态检测字典列表。
         """
         poses = []
         batch_size = outputs.shape[0]
@@ -293,16 +292,16 @@ class PoseService:
         for i in range(batch_size):
             output_i = outputs[i] if len(outputs.shape) > 1 else outputs
 
-            # Extract confidence from first output channel
+            # 从第一个输出通道提取置信度
             confidence = float(torch.sigmoid(output_i[0]).item()) if output_i.shape[0] > 0 else 0.0
 
-            # Extract keypoints from model output if available
+            # 若可用，则从模型输出中提取关键点
             keypoints = self._extract_keypoints_from_output(output_i)
 
-            # Extract bounding box from model output if available
+            # 若可用，则从模型输出中提取边界框
             bounding_box = self._extract_bbox_from_output(output_i)
 
-            # Classify activity from features
+            # 根据特征进行活动分类
             activity = self._classify_activity(output_i)
 
             pose = {
@@ -319,18 +318,17 @@ class PoseService:
         return poses
 
     def _extract_keypoints_from_output(self, output: torch.Tensor) -> List[Dict[str, Any]]:
-        """Extract keypoints from a single person's model output.
+        """从单个人的模型输出中提取关键点。
 
-        Attempts to decode keypoint coordinates from the output tensor.
-        If the tensor does not contain enough data for full keypoints,
-        returns keypoints with zero coordinates and confidence derived
-        from available data.
+        尝试从输出张量中解码关键点坐标。
+        如果张量中不包含完整关键点所需的数据，
+        则返回坐标为零、置信度基于可用数据推断的关键点结果。
 
         Args:
-            output: Single-person output tensor.
+            output: 单个人的输出张量。
 
         Returns:
-            List of keypoint dictionaries.
+            关键点字典列表。
         """
         keypoint_names = [
             "nose", "left_eye", "right_eye", "left_ear", "right_ear",
@@ -340,8 +338,8 @@ class PoseService:
         ]
 
         keypoints = []
-        # Each keypoint needs 3 values: x, y, confidence
-        # Skip first value (overall confidence), keypoints start at index 1
+        # 每个关键点需要 3 个值：x、y、confidence
+        # 跳过第一个值（整体置信度），关键点从索引 1 开始
         kp_start = 1
         values_per_kp = 3
         total_kp_values = len(keypoint_names) * values_per_kp
@@ -355,25 +353,24 @@ class PoseService:
                 conf = float(torch.sigmoid(kp_data[offset + 2]).item())
                 keypoints.append({"name": name, "x": x, "y": y, "confidence": conf})
         else:
-            # Not enough output dimensions for full keypoints; return zeros
+            # 输出维度不足以构成完整关键点；返回全零结果
             for name in keypoint_names:
                 keypoints.append({"name": name, "x": 0.0, "y": 0.0, "confidence": 0.0})
 
         return keypoints
 
     def _extract_bbox_from_output(self, output: torch.Tensor) -> Dict[str, float]:
-        """Extract bounding box from a single person's model output.
+        """从单个人的模型输出中提取边界框。
 
-        Looks for bbox values after the keypoint section. If not available,
-        returns a zero bounding box.
+        在关键点区段之后查找边界框数值。若不存在，则返回零边界框。
 
         Args:
-            output: Single-person output tensor.
+            output: 单个人的输出张量。
 
         Returns:
-            Bounding box dictionary with x, y, width, height.
+            包含 `x`、`y`、`width`、`height` 的边界框字典。
         """
-        # Bounding box comes after: 1 (confidence) + 17*3 (keypoints) = 52
+        # 边界框位于以下内容之后：1（置信度） + 17*3（关键点） = 52
         bbox_start = 52
         if output.shape[0] >= bbox_start + 4:
             x = float(torch.sigmoid(output[bbox_start]).item())
@@ -385,13 +382,13 @@ class PoseService:
             return {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
     
     def _generate_mock_poses(self) -> List[Dict[str, Any]]:
-        """Generate mock pose data for development.
+        """生成用于开发的模拟姿态数据。
 
-        Delegates to the testing module. Only callable when mock_pose_data is True.
+        委托给 testing 模块。仅在 `mock_pose_data=True` 时可调用。
 
         Raises:
-            NotImplementedError: If called without mock_pose_data enabled,
-                indicating that real CSI data and trained models are required.
+            NotImplementedError: 当未启用 `mock_pose_data` 却调用该方法时抛出，
+                表示此时必须提供真实 CSI 数据和训练后的模型。
         """
         if not self.settings.mock_pose_data:
             raise NotImplementedError(
@@ -404,14 +401,14 @@ class PoseService:
         return generate_mock_poses(max_persons=self.settings.pose_max_persons)
 
     def _classify_activity(self, features: torch.Tensor) -> str:
-        """Classify activity from model features.
+        """根据模型特征对活动进行分类。
 
-        Uses the magnitude of the feature tensor to make a simple threshold-based
-        classification. This is a basic heuristic; a proper activity classifier
-        should be trained and loaded alongside the pose model.
+        通过特征张量的幅值执行简单的阈值分类。
+        这只是基础启发式方法；更合理的做法是训练并加载独立的活动分类器，
+        与姿态模型一同使用。
         """
         feature_norm = float(torch.norm(features).item())
-        # Deterministic classification based on feature magnitude ranges
+        # 基于特征幅值范围的确定性分类
         if feature_norm > 2.0:
             return "walking"
         elif feature_norm > 1.0:
@@ -424,7 +421,7 @@ class PoseService:
             return "unknown"
     
     def _update_stats(self, poses: List[Dict[str, Any]], processing_time: float):
-        """Update processing statistics."""
+        """更新处理统计信息。"""
         self.stats["total_processed"] += 1
         
         if poses:
@@ -432,20 +429,20 @@ class PoseService:
             confidences = [pose.get("confidence", 0.0) for pose in poses]
             avg_confidence = sum(confidences) / len(confidences)
             
-            # Update running average
+            # 更新运行平均值
             total = self.stats["successful_detections"]
             current_avg = self.stats["average_confidence"]
             self.stats["average_confidence"] = (current_avg * (total - 1) + avg_confidence) / total
         else:
             self.stats["failed_detections"] += 1
         
-        # Update processing time (running average)
+        # 更新处理耗时（运行平均值）
         total = self.stats["total_processed"]
         current_avg = self.stats["processing_time_ms"]
         self.stats["processing_time_ms"] = (current_avg * (total - 1) + processing_time) / total
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get service status."""
+        """获取服务状态。"""
         return {
             "status": "healthy" if self.is_running and not self.last_error else "unhealthy",
             "initialized": self.is_initialized,
@@ -461,7 +458,7 @@ class PoseService:
         }
     
     async def get_metrics(self) -> Dict[str, Any]:
-        """Get service metrics."""
+        """获取服务指标。"""
         return {
             "pose_service": {
                 "total_processed": self.stats["total_processed"],
@@ -476,7 +473,7 @@ class PoseService:
         }
     
     async def reset(self):
-        """Reset service state."""
+        """重置服务状态。"""
         self.stats = {
             "total_processed": 0,
             "successful_detections": 0,
@@ -487,22 +484,22 @@ class PoseService:
         self.last_error = None
         self.logger.info("Pose service reset")
     
-    # API endpoint methods
+    # API 端点方法
     async def estimate_poses(self, zone_ids=None, confidence_threshold=None, max_persons=None,
                            include_keypoints=True, include_segmentation=False,
                            csi_data: Optional[np.ndarray] = None):
-        """Estimate poses with API parameters.
+        """根据 API 参数估计姿态。
 
         Args:
-            zone_ids: List of zone identifiers to estimate poses for.
-            confidence_threshold: Minimum confidence threshold for detections.
-            max_persons: Maximum number of persons to return.
-            include_keypoints: Whether to include keypoint data.
-            include_segmentation: Whether to include segmentation masks.
-            csi_data: Real CSI data array. Required when mock_pose_data is False.
+            zone_ids: 要进行姿态估计的区域标识列表。
+            confidence_threshold: 检测的最小置信度阈值。
+            max_persons: 返回的最大人数。
+            include_keypoints: 是否包含关键点数据。
+            include_segmentation: 是否包含分割掩码。
+            csi_data: 真实 CSI 数据数组。当 `mock_pose_data=False` 时必须提供。
 
         Raises:
-            NotImplementedError: If no CSI data is provided and mock mode is off.
+            NotImplementedError: 当未提供 CSI 数据且未启用模拟模式时抛出。
         """
         try:
             if csi_data is None and not self.settings.mock_pose_data:
@@ -521,10 +518,10 @@ class PoseService:
             }
 
             if csi_data is not None:
-                # Process real CSI data
+                # 处理真实 CSI 数据
                 result = await self.process_csi_data(csi_data, metadata)
             else:
-                # Mock mode: generate mock poses directly (no fake CSI data)
+                # 模拟模式：直接生成模拟姿态（不伪造 CSI 数据）
                 from src.testing.mock_pose_generator import generate_mock_poses
                 start_time = datetime.now()
                 mock_poses = generate_mock_poses(
@@ -539,7 +536,7 @@ class PoseService:
                     "confidence_scores": [p.get("confidence", 0.0) for p in mock_poses],
                 }
 
-            # Format for API response
+            # 格式化为 API 响应
             persons = []
             for i, pose in enumerate(result["poses"]):
                 person = {
@@ -561,7 +558,7 @@ class PoseService:
 
                 persons.append(person)
 
-            # Zone summary
+            # 区域汇总
             zone_summary = {}
             for zone_id in (zone_ids or ["zone_1"]):
                 zone_summary[zone_id] = len([p for p in persons if p.get("zone_id") == zone_id])
@@ -581,22 +578,22 @@ class PoseService:
     
     async def analyze_with_params(self, zone_ids=None, confidence_threshold=None, max_persons=None,
                                 include_keypoints=True, include_segmentation=False):
-        """Analyze pose data with custom parameters."""
+        """使用自定义参数分析姿态数据。"""
         return await self.estimate_poses(zone_ids, confidence_threshold, max_persons,
                                        include_keypoints, include_segmentation)
     
     async def get_zone_occupancy(self, zone_id: str):
-        """Get current occupancy for a specific zone.
+        """获取指定区域的当前占用情况。
 
-        In mock mode, delegates to testing module. In production mode, returns
-        data based on actual pose estimation results or reports no data available.
+        在模拟模式下，委托给 testing 模块处理。
+        在生产模式下，返回基于实际姿态估计结果的数据，或提示暂无可用数据。
         """
         try:
             if self.settings.mock_pose_data:
                 from src.testing.mock_pose_generator import generate_mock_zone_occupancy
                 return generate_mock_zone_occupancy(zone_id)
 
-            # Production: no real-time occupancy data without active CSI stream
+            # 生产模式：若没有活动中的 CSI 流，则不存在实时占用数据
             return {
                 "count": 0,
                 "max_occupancy": 10,
@@ -610,17 +607,17 @@ class PoseService:
             return None
     
     async def get_zones_summary(self):
-        """Get occupancy summary for all zones.
+        """获取所有区域的占用汇总。
 
-        In mock mode, delegates to testing module. In production, returns
-        empty zones until real CSI data is being processed.
+        在模拟模式下，委托给 testing 模块处理。
+        在生产模式下，在真实 CSI 数据开始处理前返回空区域结果。
         """
         try:
             if self.settings.mock_pose_data:
                 from src.testing.mock_pose_generator import generate_mock_zones_summary
                 return generate_mock_zones_summary()
 
-            # Production: no real-time data without active CSI stream
+            # 生产模式：若没有活动中的 CSI 流，则没有实时数据
             zones = ["zone_1", "zone_2", "zone_3", "zone_4"]
             zone_data = {}
             for zone_id in zones:
@@ -643,10 +640,10 @@ class PoseService:
     
     async def get_historical_data(self, start_time, end_time, zone_ids=None,
                                 aggregation_interval=300, include_raw_data=False):
-        """Get historical pose estimation data.
+        """获取历史姿态估计数据。
 
-        In mock mode, delegates to testing module. In production, returns
-        empty data indicating no historical records are stored yet.
+        在模拟模式下，委托给 testing 模块处理。
+        在生产模式下，返回空数据，表示当前尚未存储历史记录。
         """
         try:
             if self.settings.mock_pose_data:
@@ -659,7 +656,7 @@ class PoseService:
                     include_raw_data=include_raw_data,
                 )
 
-            # Production: no historical data without a persistence backend
+            # 生产模式：若无持久化后端，则不存在历史数据
             return {
                 "aggregated_data": [],
                 "raw_data": [] if include_raw_data else None,
@@ -672,17 +669,17 @@ class PoseService:
             raise
     
     async def get_recent_activities(self, zone_id=None, limit=10):
-        """Get recently detected activities.
+        """获取最近检测到的活动。
 
-        In mock mode, delegates to testing module. In production, returns
-        empty list indicating no activity data has been recorded yet.
+        在模拟模式下，委托给 testing 模块处理。
+        在生产模式下，返回空列表，表示尚未记录活动数据。
         """
         try:
             if self.settings.mock_pose_data:
                 from src.testing.mock_pose_generator import generate_mock_recent_activities
                 return generate_mock_recent_activities(zone_id=zone_id, limit=limit)
 
-            # Production: no activity records without an active CSI stream
+            # 生产模式：若没有活动中的 CSI 流，则不存在活动记录
             return []
 
         except Exception as e:
@@ -690,11 +687,11 @@ class PoseService:
             raise
     
     async def is_calibrating(self):
-        """Check if calibration is in progress."""
+        """检查校准是否正在进行中。"""
         return self._calibration_in_progress
 
     async def start_calibration(self):
-        """Start calibration process."""
+        """启动校准流程。"""
         import uuid
         calibration_id = str(uuid.uuid4())
         self._calibration_id = calibration_id
@@ -704,16 +701,16 @@ class PoseService:
         return calibration_id
 
     async def run_calibration(self, calibration_id):
-        """Run calibration process: collect baseline CSI statistics over 5 seconds."""
+        """执行校准流程：在 5 秒内采集基线 CSI 统计数据。"""
         self.logger.info(f"Running calibration: {calibration_id}")
-        # Collect baseline noise floor over 5 seconds at the configured sampling rate
+        # 按配置采样率在 5 秒内采集基线噪声底
         await asyncio.sleep(5)
         self._calibration_in_progress = False
         self._calibration_id = None
         self.logger.info(f"Calibration completed: {calibration_id}")
 
     async def get_calibration_status(self):
-        """Get current calibration status."""
+        """获取当前校准状态。"""
         if self._calibration_in_progress and self._calibration_start is not None:
             elapsed = (datetime.now() - self._calibration_start).total_seconds()
             progress = min(100.0, (elapsed / 5.0) * 100.0)
@@ -735,17 +732,17 @@ class PoseService:
         }
     
     async def get_statistics(self, start_time, end_time):
-        """Get pose estimation statistics.
+        """获取姿态估计统计信息。
 
-        In mock mode, delegates to testing module. In production, returns
-        actual accumulated statistics from self.stats, or indicates no data.
+        在模拟模式下，委托给 testing 模块处理。
+        在生产模式下，返回 `self.stats` 中实际累计的统计信息，或提示暂无数据。
         """
         try:
             if self.settings.mock_pose_data:
                 from src.testing.mock_pose_generator import generate_mock_statistics
                 return generate_mock_statistics(start_time=start_time, end_time=end_time)
 
-            # Production: return actual accumulated statistics
+            # 生产模式：返回实际累计的统计数据
             total = self.stats["total_processed"]
             successful = self.stats["successful_detections"]
             failed = self.stats["failed_detections"]
@@ -773,23 +770,23 @@ class PoseService:
             raise
     
     async def process_segmentation_data(self, frame_id):
-        """Process segmentation data in background."""
+        """在后台处理分割数据。"""
         self.logger.info(f"Processing segmentation data for frame: {frame_id}")
-        # Mock background processing
+        # 模拟后台处理
         await asyncio.sleep(2)
         self.logger.info(f"Segmentation processing completed for frame: {frame_id}")
     
-    # WebSocket streaming methods
+    # WebSocket 流式方法
     async def get_current_pose_data(self):
-        """Get current pose data for streaming."""
+        """获取用于流推送的当前姿态数据。"""
         try:
-            # Generate current pose data
+            # 生成当前姿态数据
             result = await self.estimate_poses()
             
-            # Format data by zones for WebSocket streaming
+            # 为 WebSocket 推送按区域整理数据格式
             zone_data = {}
             
-            # Group persons by zone
+            # 按区域对人员进行分组
             for person in result["persons"]:
                 zone_id = person.get("zone_id", "zone_1")
                 
@@ -810,12 +807,12 @@ class PoseService:
                 zone_data[zone_id]["pose"]["persons"].append(person)
                 zone_data[zone_id]["pose"]["count"] += 1
                 
-                # Update zone confidence (average)
+                # 更新区域置信度（平均值）
                 current_confidence = zone_data[zone_id]["confidence"]
                 person_confidence = person.get("confidence", 0.0)
                 zone_data[zone_id]["confidence"] = (current_confidence + person_confidence) / 2
                 
-                # Set activity if not already set
+                # 如果尚未设置活动类型，则写入当前活动
                 if not zone_data[zone_id]["activity"] and person.get("activity"):
                     zone_data[zone_id]["activity"] = person["activity"]
             
@@ -823,12 +820,12 @@ class PoseService:
             
         except Exception as e:
             self.logger.error(f"Error getting current pose data: {e}")
-            # Return empty zone data on error
+            # 出错时返回空的区域数据
             return {}
     
-    # Health check methods
+    # 健康检查方法
     async def health_check(self):
-        """Perform health check."""
+        """执行健康检查。"""
         try:
             status = "healthy" if self.is_running and not self.last_error else "unhealthy"
             
@@ -852,5 +849,5 @@ class PoseService:
             }
     
     async def is_ready(self):
-        """Check if service is ready."""
+        """检查服务是否就绪。"""
         return self.is_initialized and self.is_running

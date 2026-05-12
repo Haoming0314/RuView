@@ -1,5 +1,5 @@
 """
-Main service orchestrator for WiFi-DensePose API
+WiFi-DensePose API 的主服务编排器
 """
 
 import asyncio
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ServiceOrchestrator:
-    """Main service orchestrator that manages all application services."""
+    """负责管理所有应用服务的主服务编排器。"""
     
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -31,18 +31,18 @@ class ServiceOrchestrator:
         self._initialized = False
         self._started = False
         
-        # Core services
+        # 核心服务
         self.health_service = HealthCheckService(settings)
         self.metrics_service = MetricsService(settings)
         
-        # Application services (will be initialized later)
+        # 应用服务（稍后初始化）
         self.hardware_service = None
         self.pose_service = None
         self.stream_service = None
         self.pose_stream_handler = None
     
     async def initialize(self):
-        """Initialize all services."""
+        """初始化所有服务。"""
         if self._initialized:
             logger.warning("Services already initialized")
             return
@@ -50,14 +50,14 @@ class ServiceOrchestrator:
         logger.info("Initializing services...")
         
         try:
-            # Initialize core services
+            # 初始化核心服务
             await self.health_service.initialize()
             await self.metrics_service.initialize()
             
-            # Initialize application services
+            # 初始化应用服务
             await self._initialize_application_services()
             
-            # Store services in registry
+            # 将服务存入注册表
             self._services = {
                 'health': self.health_service,
                 'metrics': self.metrics_service,
@@ -77,24 +77,24 @@ class ServiceOrchestrator:
             raise
     
     async def _initialize_application_services(self):
-        """Initialize application-specific services."""
+        """初始化应用特定服务。"""
         try:
-            # Initialize hardware service
+            # 初始化硬件服务
             self.hardware_service = get_hardware_service()
             await self.hardware_service.initialize()
             logger.info("Hardware service initialized")
             
-            # Initialize pose service
+            # 初始化姿态服务
             self.pose_service = get_pose_service()
             await self.pose_service.initialize()
             logger.info("Pose service initialized")
             
-            # Initialize stream service
+            # 初始化流服务
             self.stream_service = get_stream_service()
             await self.stream_service.initialize()
             logger.info("Stream service initialized")
             
-            # Initialize pose stream handler
+            # 初始化姿态流处理器
             self.pose_stream_handler = PoseStreamHandler(
                 connection_manager=connection_manager,
                 pose_service=self.pose_service,
@@ -107,7 +107,7 @@ class ServiceOrchestrator:
             raise
     
     async def start(self):
-        """Start all services and background tasks."""
+        """启动所有服务和后台任务。"""
         if not self._initialized:
             await self.initialize()
         
@@ -118,14 +118,14 @@ class ServiceOrchestrator:
         logger.info("Starting services...")
         
         try:
-            # Start core services
+            # 启动核心服务
             await self.health_service.start()
             await self.metrics_service.start()
             
-            # Start application services
+            # 启动应用服务
             await self._start_application_services()
             
-            # Start background tasks
+            # 启动后台任务
             await self._start_background_tasks()
             
             self._started = True
@@ -137,17 +137,17 @@ class ServiceOrchestrator:
             raise
     
     async def _start_application_services(self):
-        """Start application-specific services."""
+        """启动应用特定服务。"""
         try:
-            # Start hardware service
+            # 启动硬件服务
             if hasattr(self.hardware_service, 'start'):
                 await self.hardware_service.start()
             
-            # Start pose service
+            # 启动姿态服务
             if hasattr(self.pose_service, 'start'):
                 await self.pose_service.start()
             
-            # Start stream service
+            # 启动流服务
             if hasattr(self.stream_service, 'start'):
                 await self.stream_service.start()
             
@@ -158,19 +158,19 @@ class ServiceOrchestrator:
             raise
     
     async def _start_background_tasks(self):
-        """Start background tasks."""
+        """启动后台任务。"""
         try:
-            # Start health check monitoring
+            # 启动健康检查监控
             if self.settings.health_check_interval > 0:
                 task = asyncio.create_task(self._health_check_loop())
                 self._background_tasks.append(task)
             
-            # Start metrics collection
+            # 启动指标采集
             if self.settings.metrics_enabled:
                 task = asyncio.create_task(self._metrics_collection_loop())
                 self._background_tasks.append(task)
             
-            # Start pose streaming if enabled
+            # 若启用，则启动姿态流推送
             if self.settings.enable_real_time_processing:
                 await self.pose_stream_handler.start_streaming()
             
@@ -181,7 +181,7 @@ class ServiceOrchestrator:
             raise
     
     async def _health_check_loop(self):
-        """Background health check loop."""
+        """后台健康检查循环。"""
         logger.info("Starting health check loop")
         
         while True:
@@ -196,13 +196,13 @@ class ServiceOrchestrator:
                 await asyncio.sleep(self.settings.health_check_interval)
     
     async def _metrics_collection_loop(self):
-        """Background metrics collection loop."""
+        """后台指标采集循环。"""
         logger.info("Starting metrics collection loop")
         
         while True:
             try:
                 await self.metrics_service.collect_metrics()
-                await asyncio.sleep(60)  # Collect metrics every minute
+                await asyncio.sleep(60)  # 每分钟采集一次指标
             except asyncio.CancelledError:
                 logger.info("Metrics collection loop cancelled")
                 break
@@ -211,11 +211,11 @@ class ServiceOrchestrator:
                 await asyncio.sleep(60)
     
     async def shutdown(self):
-        """Shutdown all services and cleanup resources."""
+        """关闭所有服务并清理资源。"""
         logger.info("Shutting down services...")
         
         try:
-            # Cancel background tasks
+            # 取消后台任务
             for task in self._background_tasks:
                 if not task.done():
                     task.cancel()
@@ -224,17 +224,17 @@ class ServiceOrchestrator:
                 await asyncio.gather(*self._background_tasks, return_exceptions=True)
                 self._background_tasks.clear()
             
-            # Stop pose streaming
+            # 停止姿态流推送
             if self.pose_stream_handler:
                 await self.pose_stream_handler.shutdown()
             
-            # Shutdown connection manager
+            # 关闭连接管理器
             await connection_manager.shutdown()
             
-            # Shutdown application services
+            # 关闭应用服务
             await self._shutdown_application_services()
             
-            # Shutdown core services
+            # 关闭核心服务
             await self.health_service.shutdown()
             await self.metrics_service.shutdown()
             
@@ -247,9 +247,9 @@ class ServiceOrchestrator:
             logger.error(f"Error during shutdown: {e}")
     
     async def _shutdown_application_services(self):
-        """Shutdown application-specific services."""
+        """关闭应用特定服务。"""
         try:
-            # Shutdown services in reverse order
+            # 按相反顺序关闭服务
             if self.stream_service and hasattr(self.stream_service, 'shutdown'):
                 await self.stream_service.shutdown()
             
@@ -265,7 +265,7 @@ class ServiceOrchestrator:
             logger.error(f"Error shutting down application services: {e}")
     
     async def restart_service(self, service_name: str):
-        """Restart a specific service."""
+        """重启指定服务。"""
         logger.info(f"Restarting service: {service_name}")
         
         service = self._services.get(service_name)
@@ -273,17 +273,17 @@ class ServiceOrchestrator:
             raise ValueError(f"Service not found: {service_name}")
         
         try:
-            # Stop service
+            # 停止服务
             if hasattr(service, 'stop'):
                 await service.stop()
             elif hasattr(service, 'shutdown'):
                 await service.shutdown()
             
-            # Reinitialize service
+            # 重新初始化服务
             if hasattr(service, 'initialize'):
                 await service.initialize()
             
-            # Start service
+            # 启动服务
             if hasattr(service, 'start'):
                 await service.start()
             
@@ -294,11 +294,11 @@ class ServiceOrchestrator:
             raise
     
     async def reset_services(self):
-        """Reset all services to initial state."""
+        """将所有服务重置为初始状态。"""
         logger.info("Resetting all services")
         
         try:
-            # Reset application services
+            # 重置应用服务
             if self.hardware_service and hasattr(self.hardware_service, 'reset'):
                 await self.hardware_service.reset()
             
@@ -308,7 +308,7 @@ class ServiceOrchestrator:
             if self.stream_service and hasattr(self.stream_service, 'reset'):
                 await self.stream_service.reset()
             
-            # Reset connection manager
+            # 重置连接管理器
             await connection_manager.reset()
             
             logger.info("All services reset successfully")
@@ -318,7 +318,7 @@ class ServiceOrchestrator:
             raise
     
     async def get_service_status(self) -> Dict[str, Any]:
-        """Get status of all services."""
+        """获取所有服务的状态。"""
         status = {}
         
         for name, service in self._services.items():
@@ -333,7 +333,7 @@ class ServiceOrchestrator:
         return status
     
     async def get_service_metrics(self) -> Dict[str, Any]:
-        """Get metrics from all services."""
+        """获取所有服务的指标。"""
         metrics = {}
         
         for name, service in self._services.items():
@@ -349,7 +349,7 @@ class ServiceOrchestrator:
         return metrics
     
     async def get_service_info(self) -> Dict[str, Any]:
-        """Get information about all services."""
+        """获取所有服务的信息。"""
         info = {
             "total_services": len(self._services),
             "initialized": self._initialized,
@@ -364,7 +364,7 @@ class ServiceOrchestrator:
                 "module": type(service).__module__
             }
             
-            # Add service-specific info if available
+            # 若可用，则补充服务特定信息
             if hasattr(service, 'get_info'):
                 try:
                     service_info.update(await service.get_info())
@@ -376,17 +376,17 @@ class ServiceOrchestrator:
         return info
     
     def get_service(self, name: str) -> Optional[Any]:
-        """Get a specific service by name."""
+        """按名称获取指定服务。"""
         return self._services.get(name)
     
     @property
     def is_healthy(self) -> bool:
-        """Check if all services are healthy."""
+        """检查所有服务是否健康。"""
         return self._initialized and self._started
     
     @asynccontextmanager
     async def service_context(self):
-        """Context manager for service lifecycle."""
+        """用于服务生命周期管理的上下文管理器。"""
         try:
             await self.initialize()
             await self.start()

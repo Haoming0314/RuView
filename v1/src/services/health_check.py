@@ -1,5 +1,5 @@
 """
-Health check service for WiFi-DensePose API
+WiFi-DensePose API 的健康检查服务
 """
 
 import asyncio
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class HealthStatus(Enum):
-    """Health status enumeration."""
+    """健康状态枚举。"""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -25,7 +25,7 @@ class HealthStatus(Enum):
 
 @dataclass
 class HealthCheck:
-    """Health check result."""
+    """健康检查结果。"""
     name: str
     status: HealthStatus
     message: str
@@ -36,7 +36,7 @@ class HealthCheck:
 
 @dataclass
 class ServiceHealth:
-    """Service health information."""
+    """服务健康信息。"""
     name: str
     status: HealthStatus
     last_check: Optional[datetime] = None
@@ -47,7 +47,7 @@ class ServiceHealth:
 
 
 class HealthCheckService:
-    """Service for monitoring application health."""
+    """用于监控应用健康状态的服务。"""
     
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -57,13 +57,13 @@ class HealthCheckService:
         self._running = False
     
     async def initialize(self):
-        """Initialize health check service."""
+        """初始化健康检查服务。"""
         if self._initialized:
             return
         
         logger.info("Initializing health check service")
         
-        # Initialize service health tracking
+        # 初始化服务健康状态跟踪
         self._services = {
             "api": ServiceHealth("api", HealthStatus.UNKNOWN),
             "database": ServiceHealth("database", HealthStatus.UNKNOWN),
@@ -77,7 +77,7 @@ class HealthCheckService:
         logger.info("Health check service initialized")
     
     async def start(self):
-        """Start health check service."""
+        """启动健康检查服务。"""
         if not self._initialized:
             await self.initialize()
         
@@ -85,19 +85,19 @@ class HealthCheckService:
         logger.info("Health check service started")
     
     async def shutdown(self):
-        """Shutdown health check service."""
+        """关闭健康检查服务。"""
         self._running = False
         logger.info("Health check service shut down")
     
     async def perform_health_checks(self) -> Dict[str, HealthCheck]:
-        """Perform all health checks."""
+        """执行所有健康检查。"""
         if not self._running:
             return {}
         
         logger.debug("Performing health checks")
         results = {}
         
-        # Perform individual health checks
+        # 执行各项独立健康检查
         checks = [
             self._check_api_health(),
             self._check_database_health(),
@@ -107,10 +107,10 @@ class HealthCheckService:
             self._check_stream_health(),
         ]
         
-        # Run checks concurrently
+        # 并发运行各项检查
         check_results = await asyncio.gather(*checks, return_exceptions=True)
         
-        # Process results
+        # 处理检查结果
         for i, result in enumerate(check_results):
             check_name = ["api", "database", "redis", "hardware", "pose", "stream"][i]
             
@@ -130,11 +130,11 @@ class HealthCheckService:
         return results
     
     async def _check_api_health(self) -> HealthCheck:
-        """Check API health."""
+        """检查 API 健康状态。"""
         start_time = time.time()
         
         try:
-            # Basic API health check
+            # 基础 API 健康检查
             uptime = time.time() - self._start_time
             
             status = HealthStatus.HEALTHY
@@ -160,11 +160,11 @@ class HealthCheckService:
         )
     
     async def _check_database_health(self) -> HealthCheck:
-        """Check database health."""
+        """检查数据库健康状态。"""
         start_time = time.time()
         
         try:
-            # Import here to avoid circular imports
+            # 在此处导入以避免循环依赖
             from src.database.connection import get_database_manager
             
             db_manager = get_database_manager()
@@ -174,7 +174,7 @@ class HealthCheckService:
                 message = "Database is not connected"
                 details = {"connected": False}
             else:
-                # Test database connection
+                # 测试数据库连接
                 await db_manager.test_connection()
                 
                 status = HealthStatus.HEALTHY
@@ -201,7 +201,7 @@ class HealthCheckService:
         )
     
     async def _check_redis_health(self) -> HealthCheck:
-        """Check Redis health."""
+        """检查 Redis 健康状态。"""
         start_time = time.time()
         
         try:
@@ -212,7 +212,7 @@ class HealthCheckService:
                 message = "Redis is not configured"
                 details = {"configured": False}
             else:
-                # Test Redis connection
+                # 测试 Redis 连接
                 import redis.asyncio as redis
                 
                 redis_client = redis.from_url(redis_config)
@@ -239,11 +239,11 @@ class HealthCheckService:
         )
     
     async def _check_hardware_health(self) -> HealthCheck:
-        """Check hardware service health."""
+        """检查硬件服务健康状态。"""
         start_time = time.time()
         
         try:
-            # Import here to avoid circular imports
+            # 在此处导入以避免循环依赖
             from src.api.dependencies import get_hardware_service
             
             hardware_service = get_hardware_service()
@@ -280,11 +280,11 @@ class HealthCheckService:
         )
     
     async def _check_pose_health(self) -> HealthCheck:
-        """Check pose service health."""
+        """检查姿态服务健康状态。"""
         start_time = time.time()
         
         try:
-            # Import here to avoid circular imports
+            # 在此处导入以避免循环依赖
             from src.api.dependencies import get_pose_service
             
             pose_service = get_pose_service()
@@ -321,11 +321,11 @@ class HealthCheckService:
         )
     
     async def _check_stream_health(self) -> HealthCheck:
-        """Check stream service health."""
+        """检查流服务健康状态。"""
         start_time = time.time()
         
         try:
-            # Import here to avoid circular imports
+            # 在此处导入以避免循环依赖
             from src.api.dependencies import get_stream_service
             
             stream_service = get_stream_service()
@@ -362,7 +362,7 @@ class HealthCheckService:
         )
     
     def _update_service_health(self, service_name: str, health_check: HealthCheck):
-        """Update service health information."""
+        """更新服务健康信息。"""
         if service_name not in self._services:
             self._services[service_name] = ServiceHealth(service_name, HealthStatus.UNKNOWN)
         
@@ -371,25 +371,25 @@ class HealthCheckService:
         service_health.last_check = health_check.timestamp
         service_health.uptime = time.time() - self._start_time
         
-        # Keep last 10 checks
+        # 仅保留最近 10 次检查记录
         service_health.checks.append(health_check)
         if len(service_health.checks) > 10:
             service_health.checks.pop(0)
         
-        # Update error tracking
+        # 更新错误跟踪信息
         if health_check.status == HealthStatus.UNHEALTHY:
             service_health.error_count += 1
             service_health.last_error = health_check.message
     
     async def get_overall_health(self) -> Dict[str, Any]:
-        """Get overall system health."""
+        """获取系统整体健康状态。"""
         if not self._services:
             return {
                 "status": HealthStatus.UNKNOWN.value,
                 "message": "Health checks not initialized"
             }
         
-        # Determine overall status
+        # 判定整体状态
         statuses = [service.status for service in self._services.values()]
         
         if all(status == HealthStatus.HEALTHY for status in statuses):
@@ -430,7 +430,7 @@ class HealthCheckService:
         }
     
     async def get_service_health(self, service_name: str) -> Optional[Dict[str, Any]]:
-        """Get health information for a specific service."""
+        """获取指定服务的健康信息。"""
         service = self._services.get(service_name)
         if not service:
             return None
@@ -450,12 +450,12 @@ class HealthCheckService:
                     "duration_ms": check.duration_ms,
                     "details": check.details
                 }
-                for check in service.checks[-5:]  # Last 5 checks
+                for check in service.checks[-5:]  # 最近 5 次检查
             ]
         }
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get health check service status."""
+        """获取健康检查服务状态。"""
         return {
             "status": "healthy" if self._running else "stopped",
             "initialized": self._initialized,

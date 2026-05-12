@@ -1,5 +1,5 @@
 """
-Services package for WiFi-DensePose API
+WiFi-DensePose API 的服务包
 """
 
 from .orchestrator import ServiceOrchestrator

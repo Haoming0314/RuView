@@ -1,5 +1,5 @@
 """
-Real-time streaming service for WiFi-DensePose API
+WiFi-DensePose API 的实时流服务
 """
 
 import logging
@@ -19,27 +19,27 @@ logger = logging.getLogger(__name__)
 
 
 class StreamService:
-    """Service for real-time data streaming."""
+    """提供实时数据流推送的服务。"""
     
     def __init__(self, settings: Settings, domain_config: DomainConfig):
-        """Initialize stream service."""
+        """初始化流服务。"""
         self.settings = settings
         self.domain_config = domain_config
         self.logger = logging.getLogger(__name__)
         
-        # WebSocket connections
+        # WebSocket 连接
         self.connections: Set[WebSocket] = set()
         self.connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
         
-        # Stream buffers
+        # 流缓冲区
         self.pose_buffer = deque(maxlen=self.settings.stream_buffer_size)
         self.csi_buffer = deque(maxlen=self.settings.stream_buffer_size)
         
-        # Service state
+        # 服务状态
         self.is_running = False
         self.last_error = None
         
-        # Streaming statistics
+        # 流式传输统计
         self.stats = {
             "active_connections": 0,
             "total_connections": 0,
@@ -49,30 +49,30 @@ class StreamService:
             "average_latency_ms": 0.0
         }
         
-        # Background tasks
+        # 后台任务
         self.streaming_task = None
     
     async def initialize(self):
-        """Initialize the stream service."""
+        """初始化流服务。"""
         self.logger.info("Stream service initialized")
     
     async def start(self):
-        """Start the stream service."""
+        """启动流服务。"""
         if self.is_running:
             return
         
         self.is_running = True
         self.logger.info("Stream service started")
         
-        # Start background streaming task
+        # 启动后台流任务
         if self.settings.enable_real_time_processing:
             self.streaming_task = asyncio.create_task(self._streaming_loop())
     
     async def stop(self):
-        """Stop the stream service."""
+        """停止流服务。"""
         self.is_running = False
         
-        # Cancel background task
+        # 取消后台任务
         if self.streaming_task:
             self.streaming_task.cancel()
             try:
@@ -80,13 +80,13 @@ class StreamService:
             except asyncio.CancelledError:
                 pass
         
-        # Close all connections
+        # 关闭所有连接
         await self._close_all_connections()
         
         self.logger.info("Stream service stopped")
     
     async def add_connection(self, websocket: WebSocket, metadata: Dict[str, Any] = None):
-        """Add a new WebSocket connection."""
+        """添加新的 WebSocket 连接。"""
         try:
             await websocket.accept()
             self.connections.add(websocket)
@@ -97,7 +97,7 @@ class StreamService:
             
             self.logger.info(f"New WebSocket connection added. Total: {len(self.connections)}")
             
-            # Send initial data if available
+            # 若有可用数据，则发送初始数据
             await self._send_initial_data(websocket)
             
         except Exception as e:
@@ -105,7 +105,7 @@ class StreamService:
             raise
     
     async def remove_connection(self, websocket: WebSocket):
-        """Remove a WebSocket connection."""
+        """移除一个 WebSocket 连接。"""
         try:
             if websocket in self.connections:
                 self.connections.remove(websocket)
@@ -119,18 +119,18 @@ class StreamService:
             self.logger.error(f"Error removing WebSocket connection: {e}")
     
     async def broadcast_pose_data(self, pose_data: Dict[str, Any]):
-        """Broadcast pose data to all connected clients."""
+        """向所有已连接客户端广播姿态数据。"""
         if not self.is_running:
             return
         
-        # Add to buffer
+        # 加入缓冲区
         self.pose_buffer.append({
             "type": "pose_data",
             "timestamp": datetime.now().isoformat(),
             "data": pose_data
         })
         
-        # Broadcast to all connections
+        # 广播到所有连接
         await self._broadcast_message({
             "type": "pose_update",
             "timestamp": datetime.now().isoformat(),
@@ -138,14 +138,14 @@ class StreamService:
         })
     
     async def broadcast_csi_data(self, csi_data: np.ndarray, metadata: Dict[str, Any]):
-        """Broadcast CSI data to all connected clients."""
+        """向所有已连接客户端广播 CSI 数据。"""
         if not self.is_running:
             return
         
-        # Convert numpy array to list for JSON serialization
+        # 将 numpy 数组转换为列表，以便 JSON 序列化
         csi_list = csi_data.tolist() if isinstance(csi_data, np.ndarray) else csi_data
         
-        # Add to buffer
+        # 加入缓冲区
         self.csi_buffer.append({
             "type": "csi_data",
             "timestamp": datetime.now().isoformat(),
@@ -153,7 +153,7 @@ class StreamService:
             "metadata": metadata
         })
         
-        # Broadcast to all connections
+        # 广播到所有连接
         await self._broadcast_message({
             "type": "csi_update",
             "timestamp": datetime.now().isoformat(),
@@ -162,7 +162,7 @@ class StreamService:
         })
     
     async def broadcast_system_status(self, status_data: Dict[str, Any]):
-        """Broadcast system status to all connected clients."""
+        """向所有已连接客户端广播系统状态。"""
         if not self.is_running:
             return
         
@@ -173,7 +173,7 @@ class StreamService:
         })
     
     async def send_to_connection(self, websocket: WebSocket, message: Dict[str, Any]):
-        """Send message to a specific connection."""
+        """向指定连接发送消息。"""
         try:
             if websocket in self.connections:
                 await websocket.send_text(json.dumps(message))
@@ -185,7 +185,7 @@ class StreamService:
             await self.remove_connection(websocket)
     
     async def _broadcast_message(self, message: Dict[str, Any]):
-        """Broadcast message to all connected clients."""
+        """向所有已连接客户端广播消息。"""
         if not self.connections:
             return
         
@@ -201,7 +201,7 @@ class StreamService:
                 self.stats["messages_failed"] += 1
                 disconnected.add(websocket)
         
-        # Remove disconnected clients
+        # 移除已断开的客户端
         for websocket in disconnected:
             await self.remove_connection(websocket)
         
@@ -209,27 +209,27 @@ class StreamService:
             self.stats["data_points_streamed"] += 1
     
     async def _send_initial_data(self, websocket: WebSocket):
-        """Send initial data to a new connection."""
+        """向新连接发送初始数据。"""
         try:
-            # Send recent pose data
+            # 发送最近的姿态数据
             if self.pose_buffer:
-                recent_poses = list(self.pose_buffer)[-10:]  # Last 10 poses
+                recent_poses = list(self.pose_buffer)[-10:]  # 最近 10 条姿态数据
                 await self.send_to_connection(websocket, {
                     "type": "initial_poses",
                     "timestamp": datetime.now().isoformat(),
                     "data": recent_poses
                 })
             
-            # Send recent CSI data
+            # 发送最近的 CSI 数据
             if self.csi_buffer:
-                recent_csi = list(self.csi_buffer)[-5:]  # Last 5 CSI readings
+                recent_csi = list(self.csi_buffer)[-5:]  # 最近 5 条 CSI 读数
                 await self.send_to_connection(websocket, {
                     "type": "initial_csi",
                     "timestamp": datetime.now().isoformat(),
                     "data": recent_csi
                 })
             
-            # Send service status
+            # 发送服务状态
             status = await self.get_status()
             await self.send_to_connection(websocket, {
                 "type": "service_status",
@@ -241,10 +241,10 @@ class StreamService:
             self.logger.error(f"Error sending initial data: {e}")
     
     async def _streaming_loop(self):
-        """Background streaming loop for periodic updates."""
+        """用于周期性更新的后台流循环。"""
         try:
             while self.is_running:
-                # Send periodic heartbeat
+                # 发送周期性心跳
                 if self.connections:
                     await self._broadcast_message({
                         "type": "heartbeat",
@@ -252,7 +252,7 @@ class StreamService:
                         "active_connections": len(self.connections)
                     })
                 
-                # Wait for next iteration
+                # 等待下一轮循环
                 await asyncio.sleep(self.settings.websocket_ping_interval)
                 
         except asyncio.CancelledError:
@@ -262,7 +262,7 @@ class StreamService:
             self.last_error = str(e)
     
     async def _close_all_connections(self):
-        """Close all WebSocket connections."""
+        """关闭所有 WebSocket 连接。"""
         disconnected = []
         
         for websocket in self.connections.copy():
@@ -273,12 +273,12 @@ class StreamService:
                 self.logger.warning(f"Error closing connection: {e}")
                 disconnected.append(websocket)
         
-        # Clear all connections
+        # 清理所有连接
         for websocket in disconnected:
             await self.remove_connection(websocket)
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get service status."""
+        """获取服务状态。"""
         return {
             "status": "healthy" if self.is_running and not self.last_error else "unhealthy",
             "running": self.is_running,
@@ -302,7 +302,7 @@ class StreamService:
         }
     
     async def get_metrics(self) -> Dict[str, Any]:
-        """Get service metrics."""
+        """获取服务指标。"""
         total_messages = self.stats["messages_sent"] + self.stats["messages_failed"]
         success_rate = self.stats["messages_sent"] / max(1, total_messages)
         
@@ -319,7 +319,7 @@ class StreamService:
         }
     
     async def get_connection_info(self) -> List[Dict[str, Any]]:
-        """Get information about active connections."""
+        """获取活跃连接信息。"""
         connections_info = []
         
         for websocket in self.connections:
@@ -338,12 +338,12 @@ class StreamService:
         return connections_info
     
     async def reset(self):
-        """Reset service state."""
-        # Clear buffers
+        """重置服务状态。"""
+        # 清空缓冲区
         self.pose_buffer.clear()
         self.csi_buffer.clear()
         
-        # Reset statistics
+        # 重置统计信息
         self.stats = {
             "active_connections": len(self.connections),
             "total_connections": 0,
@@ -357,7 +357,7 @@ class StreamService:
         self.logger.info("Stream service reset")
     
     def get_buffer_data(self, buffer_type: str, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get data from buffers."""
+        """从缓冲区获取数据。"""
         if buffer_type == "pose":
             return list(self.pose_buffer)[-limit:]
         elif buffer_type == "csi":
@@ -367,11 +367,11 @@ class StreamService:
     
     @property
     def is_active(self) -> bool:
-        """Check if stream service is active."""
+        """检查流服务是否处于活动状态。"""
         return self.is_running
     
     async def health_check(self) -> Dict[str, Any]:
-        """Perform health check."""
+        """执行健康检查。"""
         try:
             status = "healthy" if self.is_running and not self.last_error else "unhealthy"
             
@@ -393,5 +393,5 @@ class StreamService:
             }
     
     async def is_ready(self) -> bool:
-        """Check if service is ready."""
+        """检查服务是否就绪。"""
         return self.is_running

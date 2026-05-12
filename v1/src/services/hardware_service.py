@@ -1,5 +1,5 @@
 """
-Hardware interface service for WiFi-DensePose API
+WiFi-DensePose API 的硬件接口服务
 """
 
 import logging
@@ -18,22 +18,22 @@ logger = logging.getLogger(__name__)
 
 
 class HardwareService:
-    """Service for hardware interface operations."""
+    """提供硬件接口相关操作的服务。"""
     
     def __init__(self, settings: Settings, domain_config: DomainConfig):
-        """Initialize hardware service."""
+        """初始化硬件服务。"""
         self.settings = settings
         self.domain_config = domain_config
         self.logger = logging.getLogger(__name__)
         
-        # Router interfaces
+        # 路由器接口
         self.router_interfaces: Dict[str, RouterInterface] = {}
         
-        # Service state
+        # 服务状态
         self.is_running = False
         self.last_error = None
         
-        # Data collection statistics
+        # 数据采集统计
         self.stats = {
             "total_samples": 0,
             "successful_samples": 0,
@@ -43,32 +43,32 @@ class HardwareService:
             "connected_routers": 0
         }
         
-        # Background tasks
+        # 后台任务
         self.collection_task = None
         self.monitoring_task = None
         
-        # Data buffers
+        # 数据缓冲区
         self.recent_samples = []
         self.max_recent_samples = 1000
     
     async def initialize(self):
-        """Initialize the hardware service."""
+        """初始化硬件服务。"""
         await self.start()
     
     async def start(self):
-        """Start the hardware service."""
+        """启动硬件服务。"""
         if self.is_running:
             return
         
         try:
             self.logger.info("Starting hardware service...")
             
-            # Initialize router interfaces
+            # 初始化路由器接口
             await self._initialize_routers()
             
             self.is_running = True
             
-            # Start background tasks
+            # 启动后台任务
             if not self.settings.mock_hardware:
                 self.collection_task = asyncio.create_task(self._data_collection_loop())
             
@@ -82,10 +82,10 @@ class HardwareService:
             raise
     
     async def stop(self):
-        """Stop the hardware service."""
+        """停止硬件服务。"""
         self.is_running = False
         
-        # Cancel background tasks
+        # 取消后台任务
         if self.collection_task:
             self.collection_task.cancel()
             try:
@@ -100,15 +100,15 @@ class HardwareService:
             except asyncio.CancelledError:
                 pass
         
-        # Disconnect from routers
+        # 断开与各路由器的连接
         await self._disconnect_routers()
         
         self.logger.info("Hardware service stopped")
     
     async def _initialize_routers(self):
-        """Initialize router interfaces."""
+        """初始化路由器接口。"""
         try:
-            # Get router configurations from domain config
+            # 从领域配置中获取路由器配置
             routers = self.domain_config.get_all_routers()
             
             for router_config in routers:
@@ -117,7 +117,7 @@ class HardwareService:
                 
                 router_id = router_config.router_id
                 
-                # Create router interface
+                # 创建路由器接口
                 router_interface = RouterInterface(
                     router_id=router_id,
                     host=router_config.ip_address,
@@ -128,7 +128,7 @@ class HardwareService:
                     mock_mode=self.settings.mock_hardware
                 )
                 
-                # Connect to router (always connect, even in mock mode)
+                # 连接路由器（即使在模拟模式下也执行连接）
                 await router_interface.connect()
                 
                 self.router_interfaces[router_id] = router_interface
@@ -144,7 +144,7 @@ class HardwareService:
             raise
     
     async def _disconnect_routers(self):
-        """Disconnect from all routers."""
+        """断开所有路由器连接。"""
         for router_id, interface in self.router_interfaces.items():
             try:
                 await interface.disconnect()
@@ -156,15 +156,15 @@ class HardwareService:
         self.stats["connected_routers"] = 0
     
     async def _data_collection_loop(self):
-        """Background loop for data collection."""
+        """用于数据采集的后台循环。"""
         try:
             while self.is_running:
                 start_time = time.time()
                 
-                # Collect data from all routers
+                # 从所有路由器采集数据
                 await self._collect_data_from_routers()
                 
-                # Calculate sleep time to maintain polling interval
+                # 计算休眠时间，以维持轮询间隔
                 elapsed = time.time() - start_time
                 sleep_time = max(0, self.settings.hardware_polling_interval - elapsed)
                 
@@ -178,17 +178,17 @@ class HardwareService:
             self.last_error = str(e)
     
     async def _monitoring_loop(self):
-        """Background loop for hardware monitoring."""
+        """用于硬件监控的后台循环。"""
         try:
             while self.is_running:
-                # Monitor router connections
+                # 监控路由器连接状态
                 await self._monitor_router_health()
                 
-                # Update statistics
+                # 更新统计信息
                 self._update_sample_rate_stats()
                 
-                # Wait before next check
-                await asyncio.sleep(30)  # Check every 30 seconds
+                # 等待下一次检查
+                await asyncio.sleep(30)  # 每 30 秒检查一次
                 
         except asyncio.CancelledError:
             self.logger.info("Monitoring loop cancelled")
@@ -196,14 +196,14 @@ class HardwareService:
             self.logger.error(f"Error in monitoring loop: {e}")
     
     async def _collect_data_from_routers(self):
-        """Collect CSI data from all connected routers."""
+        """从所有已连接的路由器采集 CSI 数据。"""
         for router_id, interface in self.router_interfaces.items():
             try:
-                # Get CSI data from router
+                # 从路由器获取 CSI 数据
                 csi_data = await interface.get_csi_data()
                 
                 if csi_data is not None:
-                    # Process the collected data
+                    # 处理采集到的数据
                     await self._process_collected_data(router_id, csi_data)
                     
                     self.stats["successful_samples"] += 1
@@ -219,9 +219,9 @@ class HardwareService:
                 self.stats["total_samples"] += 1
     
     async def _process_collected_data(self, router_id: str, csi_data: np.ndarray):
-        """Process collected CSI data."""
+        """处理采集到的 CSI 数据。"""
         try:
-            # Create sample metadata
+            # 创建样本元数据
             metadata = {
                 "router_id": router_id,
                 "timestamp": datetime.now().isoformat(),
@@ -229,7 +229,7 @@ class HardwareService:
                 "data_shape": csi_data.shape if hasattr(csi_data, 'shape') else None
             }
             
-            # Add to recent samples buffer
+            # 加入最近样本缓冲区
             sample = {
                 "router_id": router_id,
                 "timestamp": metadata["timestamp"],
@@ -239,19 +239,19 @@ class HardwareService:
             
             self.recent_samples.append(sample)
             
-            # Maintain buffer size
+            # 维护缓冲区大小
             if len(self.recent_samples) > self.max_recent_samples:
                 self.recent_samples.pop(0)
             
-            # Notify other services (this would typically be done through an event system)
-            # For now, we'll just log the data collection
+            # 通知其他服务（通常应通过事件系统完成）
+            # 当前实现中仅记录采集日志
             self.logger.debug(f"Collected CSI data from {router_id}: shape {csi_data.shape if hasattr(csi_data, 'shape') else 'unknown'}")
             
         except Exception as e:
             self.logger.error(f"Error processing collected data: {e}")
     
     async def _monitor_router_health(self):
-        """Monitor health of router connections."""
+        """监控路由器连接健康状态。"""
         healthy_routers = 0
         
         for router_id, interface in self.router_interfaces.items():
@@ -263,7 +263,7 @@ class HardwareService:
                 else:
                     self.logger.warning(f"Router {router_id} is unhealthy")
                     
-                    # Try to reconnect if not in mock mode
+                    # 若不处于模拟模式，则尝试重连
                     if not self.settings.mock_hardware:
                         try:
                             await interface.reconnect()
@@ -277,16 +277,16 @@ class HardwareService:
         self.stats["connected_routers"] = healthy_routers
     
     def _update_sample_rate_stats(self):
-        """Update sample rate statistics."""
+        """更新采样率统计信息。"""
         if len(self.recent_samples) < 2:
             return
         
-        # Calculate sample rate from recent samples
+        # 根据最近样本计算采样率
         recent_count = min(100, len(self.recent_samples))
         recent_samples = self.recent_samples[-recent_count:]
         
         if len(recent_samples) >= 2:
-            # Calculate time differences
+            # 计算时间差
             time_diffs = []
             for i in range(1, len(recent_samples)):
                 try:
@@ -303,7 +303,7 @@ class HardwareService:
                 self.stats["average_sample_rate"] = 1.0 / avg_interval if avg_interval > 0 else 0.0
     
     async def get_router_status(self, router_id: str) -> Dict[str, Any]:
-        """Get status of a specific router."""
+        """获取指定路由器的状态。"""
         if router_id not in self.router_interfaces:
             raise ValueError(f"Router {router_id} not found")
         
@@ -331,7 +331,7 @@ class HardwareService:
             }
     
     async def get_all_router_status(self) -> List[Dict[str, Any]]:
-        """Get status of all routers."""
+        """获取所有路由器的状态。"""
         statuses = []
         
         for router_id in self.router_interfaces:
@@ -348,13 +348,13 @@ class HardwareService:
         return statuses
     
     async def get_recent_data(self, router_id: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get recent CSI data samples."""
+        """获取最近的 CSI 数据样本。"""
         samples = self.recent_samples[-limit:] if limit else self.recent_samples
         
         if router_id:
             samples = [s for s in samples if s["router_id"] == router_id]
         
-        # Convert numpy arrays to lists for JSON serialization
+        # 将 numpy 数组转换为列表，以便 JSON 序列化
         result = []
         for sample in samples:
             sample_copy = sample.copy()
@@ -365,7 +365,7 @@ class HardwareService:
         return result
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get service status."""
+        """获取服务状态。"""
         return {
             "status": "healthy" if self.is_running and not self.last_error else "unhealthy",
             "running": self.is_running,
@@ -381,7 +381,7 @@ class HardwareService:
         }
     
     async def get_metrics(self) -> Dict[str, Any]:
-        """Get service metrics."""
+        """获取服务指标。"""
         total_samples = self.stats["total_samples"]
         success_rate = self.stats["successful_samples"] / max(1, total_samples)
         
@@ -398,7 +398,7 @@ class HardwareService:
         }
     
     async def reset(self):
-        """Reset service state."""
+        """重置服务状态。"""
         self.stats = {
             "total_samples": 0,
             "successful_samples": 0,
@@ -414,14 +414,14 @@ class HardwareService:
         self.logger.info("Hardware service reset")
     
     async def trigger_manual_collection(self, router_id: Optional[str] = None) -> Dict[str, Any]:
-        """Manually trigger data collection."""
+        """手动触发数据采集。"""
         if not self.is_running:
             raise RuntimeError("Hardware service is not running")
         
         results = {}
         
         if router_id:
-            # Collect from specific router
+            # 从指定路由器采集
             if router_id not in self.router_interfaces:
                 raise ValueError(f"Router {router_id} not found")
             
@@ -436,18 +436,18 @@ class HardwareService:
             except Exception as e:
                 results[router_id] = {"success": False, "error": str(e)}
         else:
-            # Collect from all routers
+            # 从所有路由器采集
             await self._collect_data_from_routers()
             results = {"message": "Manual collection triggered for all routers"}
         
         return results
     
     async def health_check(self) -> Dict[str, Any]:
-        """Perform health check."""
+        """执行健康检查。"""
         try:
             status = "healthy" if self.is_running and not self.last_error else "unhealthy"
             
-            # Check router health
+            # 检查路由器健康状态
             healthy_routers = 0
             total_routers = len(self.router_interfaces)
             
@@ -478,5 +478,5 @@ class HardwareService:
             }
     
     async def is_ready(self) -> bool:
-        """Check if service is ready."""
+        """检查服务是否就绪。"""
         return self.is_running and len(self.router_interfaces) > 0

@@ -1,5 +1,5 @@
 """
-Router interface for WiFi CSI data collection
+用于 WiFi CSI 数据采集的路由器接口
 """
 
 import logging
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class RouterInterface:
-    """Interface for connecting to WiFi routers and collecting CSI data."""
+    """用于连接 WiFi 路由器并采集 CSI 数据的接口。"""
     
     def __init__(
         self,
@@ -26,16 +26,16 @@ class RouterInterface:
         interface: str = "wlan0",
         mock_mode: bool = False
     ):
-        """Initialize router interface.
+        """初始化路由器接口。
         
         Args:
-            router_id: Unique identifier for the router
-            host: Router IP address or hostname
-            port: SSH port for connection
-            username: SSH username
-            password: SSH password
-            interface: WiFi interface name
-            mock_mode: Whether to use mock data instead of real connection
+            router_id: 路由器的唯一标识符
+            host: 路由器 IP 地址或主机名
+            port: 连接使用的 SSH 端口
+            username: SSH 用户名
+            password: SSH 密码
+            interface: WiFi 接口名称
+            mock_mode: 是否使用模拟数据而不是真实连接
         """
         self.router_id = router_id
         self.host = host
@@ -47,29 +47,29 @@ class RouterInterface:
         
         self.logger = logging.getLogger(f"{__name__}.{router_id}")
         
-        # Connection state
+        # 连接状态
         self.is_connected = False
         self.connection = None
         self.last_error = None
         
-        # Data collection state
+        # 数据采集状态
         self.last_data_time = None
         self.error_count = 0
         self.sample_count = 0
         
-        # Mock data generation (delegated to testing module)
+        # 模拟数据生成（委托给 testing 模块）
         self._mock_csi_generator = None
         if mock_mode:
             self._initialize_mock_generator()
 
     def _initialize_mock_generator(self):
-        """Initialize mock data generator from the testing module."""
+        """从 testing 模块初始化模拟数据生成器。"""
         from src.testing.mock_csi_generator import MockCSIGenerator
         self._mock_csi_generator = MockCSIGenerator()
         self._mock_csi_generator.show_banner()
     
     async def connect(self):
-        """Connect to the router."""
+        """连接到路由器。"""
         if self.mock_mode:
             self.is_connected = True
             self.logger.info(f"Mock connection established to router {self.router_id}")
@@ -78,9 +78,9 @@ class RouterInterface:
         try:
             self.logger.info(f"Connecting to router {self.router_id} at {self.host}:{self.port}")
             
-            # In a real implementation, this would establish SSH connection
-            # For now, we'll simulate the connection
-            await asyncio.sleep(0.1)  # Simulate connection delay
+            # 在真实实现中，这里会建立 SSH 连接
+            # 当前先模拟连接过程
+            await asyncio.sleep(0.1)  # 模拟连接延迟
             
             self.is_connected = True
             self.error_count = 0
@@ -93,10 +93,10 @@ class RouterInterface:
             raise
     
     async def disconnect(self):
-        """Disconnect from the router."""
+        """断开与路由器的连接。"""
         try:
             if self.connection:
-                # Close SSH connection
+                # 关闭 SSH 连接
                 self.connection = None
             
             self.is_connected = False
@@ -106,16 +106,16 @@ class RouterInterface:
             self.logger.error(f"Error disconnecting from router {self.router_id}: {e}")
     
     async def reconnect(self):
-        """Reconnect to the router."""
+        """重新连接路由器。"""
         await self.disconnect()
-        await asyncio.sleep(1)  # Wait before reconnecting
+        await asyncio.sleep(1)  # 重连前等待
         await self.connect()
     
     async def get_csi_data(self) -> Optional[np.ndarray]:
-        """Get CSI data from the router.
+        """从路由器获取 CSI 数据。
         
         Returns:
-            CSI data as numpy array, or None if no data available
+            以 numpy 数组形式返回 CSI 数据；若无数据则返回 None
         """
         if not self.is_connected:
             raise RuntimeError(f"Router {self.router_id} is not connected")
@@ -140,23 +140,22 @@ class RouterInterface:
             return None
     
     def _generate_mock_csi_data(self) -> np.ndarray:
-        """Generate mock CSI data for testing.
+        """生成用于测试的模拟 CSI 数据。
 
-        Delegates to the MockCSIGenerator in the testing module.
-        This method is only callable when mock_mode is True.
+        委托给 testing 模块中的 MockCSIGenerator。
+        该方法仅在 `mock_mode=True` 时可调用。
         """
         if self._mock_csi_generator is None:
             self._initialize_mock_generator()
         return self._mock_csi_generator.generate()
     
     async def _collect_real_csi_data(self) -> Optional[np.ndarray]:
-        """Collect real CSI data from the router.
+        """从路由器采集真实 CSI 数据。
 
         Raises:
-            RuntimeError: Always in the current state, because real CSI
-                data collection requires hardware setup that has not been
-                configured. This method must never silently return random
-                or placeholder data.
+            RuntimeError: 在当前状态下总会抛出，因为真实 CSI
+                数据采集依赖尚未配置的硬件环境。该方法绝不能静默返回
+                随机数据或占位数据。
         """
         raise RuntimeError(
             f"Real CSI data collection from router '{self.router_id}' requires "
@@ -169,21 +168,21 @@ class RouterInterface:
         )
     
     async def check_health(self) -> bool:
-        """Check if the router connection is healthy.
+        """检查路由器连接是否健康。
         
         Returns:
-            True if healthy, False otherwise
+            健康时返回 True，否则返回 False
         """
         if not self.is_connected:
             return False
         
         try:
-            # In mock mode, always healthy
+            # 在模拟模式下始终视为健康
             if self.mock_mode:
                 return True
             
-            # For real connections, we could ping the router or check SSH connection
-            # For now, consider healthy if error count is low
+            # 对真实连接，可通过 ping 路由器或检查 SSH 连接状态来判定
+            # 当前实现中，若错误次数较少则视为健康
             return self.error_count < 5
             
         except Exception as e:
@@ -191,10 +190,10 @@ class RouterInterface:
             return False
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get router status information.
+        """获取路由器状态信息。
         
         Returns:
-            Dictionary containing router status
+            包含路由器状态的字典
         """
         return {
             "router_id": self.router_id,
@@ -213,17 +212,17 @@ class RouterInterface:
         }
     
     async def get_router_info(self) -> Dict[str, Any]:
-        """Get router hardware information.
+        """获取路由器硬件信息。
         
         Returns:
-            Dictionary containing router information
+            包含路由器信息的字典
         """
         if self.mock_mode:
             if self._mock_csi_generator is None:
                 self._initialize_mock_generator()
             return self._mock_csi_generator.get_router_info()
         
-        # For real routers, this would query the actual hardware
+        # 对真实路由器，这里应查询实际硬件信息
         return {
             "model": "Unknown",
             "firmware": "Unknown",
@@ -238,13 +237,13 @@ class RouterInterface:
         }
     
     async def configure_csi_collection(self, config: Dict[str, Any]) -> bool:
-        """Configure CSI data collection parameters.
+        """配置 CSI 数据采集参数。
         
         Args:
-            config: Configuration dictionary
+            config: 配置字典
             
         Returns:
-            True if configuration successful, False otherwise
+            配置成功返回 True，否则返回 False
         """
         try:
             if self.mock_mode:
@@ -254,7 +253,7 @@ class RouterInterface:
                 self.logger.info(f"Mock CSI collection configured for router {self.router_id}")
                 return True
             
-            # For real routers, this would send configuration commands
+            # 对真实路由器，这里应发送配置命令
             self.logger.warning("Real CSI configuration not implemented")
             return False
             
@@ -263,10 +262,10 @@ class RouterInterface:
             return False
     
     def get_metrics(self) -> Dict[str, Any]:
-        """Get router interface metrics.
+        """获取路由器接口指标。
         
         Returns:
-            Dictionary containing metrics
+            包含指标信息的字典
         """
         uptime = 0
         if self.last_data_time:
@@ -287,7 +286,7 @@ class RouterInterface:
         }
     
     def reset_stats(self):
-        """Reset statistics counters."""
+        """重置统计计数器。"""
         self.error_count = 0
         self.sample_count = 0
         self.last_error = None
